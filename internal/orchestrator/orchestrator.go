@@ -25,13 +25,23 @@ type Orchestrator struct {
 // Config holds configuration for the orchestrator
 type Config struct {
 	PollInterval time.Duration // How often to check for song updates
+	DemoMode     bool          // Run in demo mode
+	DemoArtist   string        // Artist for demo mode
+	DemoTitle    string        // Title for demo mode
 }
 
 // NewOrchestrator creates a new orchestrator with the given configuration
 func NewOrchestrator(config Config) (*Orchestrator, error) {
-	det, err := detector.NewDetector()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create detector: %w", err)
+	var det detector.Detector
+	var err error
+
+	if config.DemoMode {
+		det = detector.NewDemoDetector(config.DemoArtist, config.DemoTitle)
+	} else {
+		det, err = detector.NewDetector()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create detector: %w", err)
+		}
 	}
 
 	return &Orchestrator{

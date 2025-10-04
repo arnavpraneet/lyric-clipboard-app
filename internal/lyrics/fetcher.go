@@ -1,11 +1,11 @@
 package lyrics
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 )
@@ -77,6 +77,14 @@ func (f *Fetcher) fetchFromSource(artist, title string) (*SyncedLyrics, error) {
 	return lyrics, nil
 }
 
+// LRCLibResponse represents the JSON response from lrclib.net API
+type LRCLibResponse struct {
+	SyncedLyrics   *string `json:"syncedLyrics"`
+	PlainLyrics    *string `json:"plainLyrics"`
+	TrackName      string  `json:"trackName"`
+	ArtistName     string  `json:"artistName"`
+}
+
 // fetchFromLRCLib fetches lyrics from lrclib.net
 func (f *Fetcher) fetchFromLRCLib(artist, title string) (string, error) {
 	baseURL := "https://lrclib.net/api/get"
@@ -95,7 +103,8 @@ func (f *Fetcher) fetchFromLRCLib(artist, title string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -103,80 +112,18 @@ func (f *Fetcher) fetchFromLRCLib(artist, title string) (string, error) {
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	// lrclib.net returns JSON, we need to extract the syncedLyrics field
-	// For simplicity, we'll do basic string parsing
-	// In production, use encoding/json
-	bodyStr := string(body)
-
-	// Simple extraction of syncedLyrics field
-	// Expected format: {"syncedLyrics":"[00:12.34]Line 1\n[00:15.67]Line 2",...}
-	start := findJSONField(bodyStr, "syncedLyrics")
-	if start == -1 {
-		return "", fmt.Errorf("syncedLyrics field not found in response")
+	// Parse JSON response
+	var lrcResponse LRCLibResponse
+	if err := json.Unmarshal(body, &lrcResponse); err != nil {
+		return "", fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
-	lrcContent := extractJSONString(bodyStr[start:])
-	if lrcContent == "" {
+	// Check if syncedLyrics is available
+	if lrcResponse.SyncedLyrics == nil || *lrcResponse.SyncedLyrics == "" {
 		return "", fmt.Errorf("no synced lyrics available for this song")
 	}
 
-	return lrcContent, nil
-}
-
-// findJSONField finds the start position of a JSON field value
-func findJSONField(json, field string) int {
-	needle := fmt.Sprintf(`"%s":"`, field)
-	pos := indexOf(json, needle)
-	if pos == -1 {
-		return -1
-	}
-	return pos + len(needle)
-}
-
-// extractJSONString extracts a JSON string value (handles basic escaping)
-func extractJSONString(json string) string {
-	var result strings.Builder
-	escaped := false
-
-	for i := 0; i < len(json); i++ {
-		ch := json[i]
-
-		if escaped {
-			// Handle escape sequences
-			switch ch {
-			case 'n':
-				result.WriteByte('\n')
-			case 't':
-				result.WriteByte('\t')
-			case 'r':
-				result.WriteByte('\r')
-			case '"', '\\':
-				result.WriteByte(ch)
-			default:
-				result.WriteByte(ch)
-			}
-			escaped = false
-		} else if ch == '\\' {
-			escaped = true
-		} else if ch == '"' {
-			// End of string
-			break
-		} else {
-			result.WriteByte(ch)
-		}
-	}
-
-	return result.String()
-}
-
-// indexOf finds the first occurrence of substr in s
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
+	return *lrcResponse.SyncedLyrics, nil
 }
 
 // ClearCache clears the lyrics cache

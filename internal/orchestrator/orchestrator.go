@@ -12,22 +12,27 @@ import (
 
 // Orchestrator is the core component that coordinates all modules
 type Orchestrator struct {
-	detector        detector.Detector
-	lyricsFetcher   *lyrics.Fetcher
-	clipboardMgr    *clipboard.Manager
-	pollInterval    time.Duration
-	currentSongKey  string
-	currentLyrics   *lyrics.SyncedLyrics
-	lastLyricText   string
-	stopChan        chan struct{}
+	detector          detector.Detector
+	lyricsFetcher     *lyrics.Fetcher
+	clipboardMgr      *clipboard.Manager
+	pollInterval      time.Duration
+	lyricOffset       time.Duration
+	updateClipboard   bool
+	currentSongKey    string
+	currentLyrics     *lyrics.SyncedLyrics
+	lastLyricText     string
+	stopChan          chan struct{}
+	statusCallback    func(status string)
 }
 
 // Config holds configuration for the orchestrator
 type Config struct {
-	PollInterval time.Duration // How often to check for song updates
-	DemoMode     bool          // Run in demo mode
-	DemoArtist   string        // Artist for demo mode
-	DemoTitle    string        // Title for demo mode
+	PollInterval    time.Duration // How often to check for song updates
+	LyricOffset     time.Duration // Time offset to apply to lyrics
+	UpdateClipboard bool          // Enable clipboard updates
+	DemoMode        bool          // Run in demo mode
+	DemoArtist      string        // Artist for demo mode
+	DemoTitle       string        // Title for demo mode
 }
 
 // NewOrchestrator creates a new orchestrator with the given configuration
@@ -45,11 +50,13 @@ func NewOrchestrator(config Config) (*Orchestrator, error) {
 	}
 
 	return &Orchestrator{
-		detector:      det,
-		lyricsFetcher: lyrics.NewFetcher(),
-		clipboardMgr:  clipboard.NewManager(),
-		pollInterval:  config.PollInterval,
-		stopChan:      make(chan struct{}),
+		detector:        det,
+		lyricsFetcher:   lyrics.NewFetcher(),
+		clipboardMgr:    clipboard.NewManager(),
+		pollInterval:    config.PollInterval,
+		lyricOffset:     config.LyricOffset,
+		updateClipboard: config.UpdateClipboard,
+		stopChan:        make(chan struct{}),
 	}, nil
 }
 

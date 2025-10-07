@@ -118,8 +118,11 @@ func (o *Orchestrator) tick() {
 		return
 	}
 
-	// Get the current lyric line based on playback position
-	currentLine := o.currentLyrics.GetLineAtTime(songInfo.Position)
+	// Apply lyric offset to playback position
+	adjustedPosition := songInfo.Position + o.lyricOffset
+
+	// Get the current lyric line based on adjusted playback position
+	currentLine := o.currentLyrics.GetLineAtTime(adjustedPosition)
 	if currentLine == nil {
 		return
 	}
@@ -128,12 +131,19 @@ func (o *Orchestrator) tick() {
 	if currentLine.Text != o.lastLyricText {
 		log.Printf("[%s] %s", formatDuration(songInfo.Position), currentLine.Text)
 
-		if err := o.clipboardMgr.Write(currentLine.Text); err != nil {
-			log.Printf("Failed to update clipboard: %v", err)
-			return
+		if o.updateClipboard {
+			if err := o.clipboardMgr.Write(currentLine.Text); err != nil {
+				log.Printf("Failed to update clipboard: %v", err)
+				return
+			}
 		}
 
 		o.lastLyricText = currentLine.Text
+
+		// Notify status callback if set
+		if o.statusCallback != nil {
+			o.statusCallback(currentLine.Text)
+		}
 	}
 }
 

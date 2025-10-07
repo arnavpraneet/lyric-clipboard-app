@@ -155,6 +155,38 @@ func (o *Orchestrator) Stop() {
 	}
 }
 
+// SetStatusCallback sets a callback function for status updates
+func (o *Orchestrator) SetStatusCallback(callback func(status string)) {
+	o.statusCallback = callback
+}
+
+// GetCurrentStatus returns the current playback status
+func (o *Orchestrator) GetCurrentStatus() string {
+	if o.currentSongKey == "" {
+		return "No song detected"
+	}
+	if o.lastLyricText == "" {
+		return fmt.Sprintf("Playing: %s", o.currentSongKey)
+	}
+	return fmt.Sprintf("%s: %s", o.currentSongKey, o.lastLyricText)
+}
+
+// SetLyricOffset updates the lyric offset dynamically
+func (o *Orchestrator) SetLyricOffset(offset time.Duration) {
+	o.lyricOffset = offset
+	log.Printf("Lyric offset updated to %v", offset)
+}
+
+// SetUpdateClipboard enables or disables clipboard updates
+func (o *Orchestrator) SetUpdateClipboard(enabled bool) {
+	o.updateClipboard = enabled
+	if enabled {
+		log.Println("Clipboard updates enabled")
+	} else {
+		log.Println("Clipboard updates disabled")
+	}
+}
+
 // formatDuration formats a duration as mm:ss
 func formatDuration(d time.Duration) string {
 	minutes := int(d.Minutes())
